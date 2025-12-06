@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المنصة التعليمية - عرض صور الملاحظات</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; --success: #10b981; --warning: #f59e0b; --danger: #ef4444; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; height: 100vh; overflow: hidden; }
+        
+        button { font-family: inherit; font-weight: bold; }
+        .btn { padding: 6px 12px; border-radius: 6px; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 5px; transition: 0.2s; font-size: 0.9rem; }
+        .btn:hover { opacity: 0.9; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-outline { background: white; border: 1px solid #ccc; color: #444; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        
+        .btn-icon { padding: 8px; border-radius: 50%; width: 35px; height: 35px; display: flex; justify-content: center; align-items: center; cursor: pointer; background: #e2e8f0; border: none; }
+        .btn-icon:hover { background: #cbd5e1; }
+
+        .header { background: white; padding: 10px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        
+        /* Grid */
+        .gallery-container { padding: 20px; overflow-y: auto; height: calc(100vh - 70px); display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; }
+        @media (max-width: 1600px) { .gallery-container { grid-template-columns: repeat(5, 1fr); } }
+        @media (max-width: 1300px) { .gallery-container { grid-template-columns: repeat(4, 1fr); } }
+        @media (max-width: 1000px) { .gallery-container { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 700px) { .gallery-container { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 450px) { .gallery-container { grid-template-columns: 1fr; } }
+        
+        .video-card { background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; transition: transform 0.2s; display: flex; flex-direction: column; border: 1px solid #e2e8f0; position: relative; }
+        .video-card:hover { transform: translateY(-3px); border-color: var(--primary); }
+        .card-img { width: 100%; height: 120px; object-fit: cover; background: #eee; display: flex; align-items: center; justify-content: center; color: #888; position: relative; }
+        .type-badge { position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.7); color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; }
+        
+        .delete-card-btn { position: absolute; top: 5px; left: 5px; background: rgba(239, 68, 68, 0.9); color: white; width: 25px; height: 25px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 1rem; border: none; cursor: pointer; z-index: 10; }
+        .delete-card-btn:hover { background: #dc2626; }
+
+        .card-body { padding: 10px; flex: 1; }
+        .card-body h3 { font-size: 0.95rem; margin: 0 0 5px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-body small { font-size: 0.75rem; color: #666; }
+        
+        /* Player & Display */
+        #playerView { display: none; height: 100vh; flex-direction: column; }
+        .main-player-layout { display: flex; flex: 1; gap: 20px; padding: 20px; overflow: hidden; }
+        
+        .display-wrapper { flex: 2; background: black; border-radius: 10px; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
+        .display-wrapper:fullscreen { border-radius: 0; }
+        .display-wrapper:fullscreen img { object-fit: contain; background: black; }
+
+        video { width: 100%; max-height: 100%; display: none; }
+        #mainDisplayImage { max-width: 100%; max-height: 100%; object-fit: contain; display: none; transition: opacity 0.5s; cursor: default; }
+
+        /* --- زر إغلاق الصورة (الجديد) --- */
+        #closePreviewBtn {
+            position: absolute; top: 20px; right: 20px;
+            background: rgba(220, 38, 38, 0.8); color: white;
+            border: none; border-radius: 50%;
+            width: 40px; height: 40px;
+            font-size: 1.2rem; cursor: pointer;
+            display: none; /* يظهر فقط عند عرض صورة ملاحظة فوق الفيديو */
+            z-index: 30;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        }
+        #closePreviewBtn:hover { background: #dc2626; transform: scale(1.1); }
+
+        /* Zoom Lens */
+        #zoomLens { position: absolute; border: 3px solid rgba(255, 255, 255, 0.8); border-radius: 50%; width: 200px; height: 200px; box-shadow: 0 0 10px rgba(0,0,0,0.5), inset 0 0 10px rgba(0,0,0,0.5); cursor: none; display: none; z-index: 50; background-repeat: no-repeat; pointer-events: none; }
+        .zoom-active-cursor { cursor: none !important; }
+
+        /* Top Play Button */
+        #topPlayBtn { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.2); color: rgba(255, 255, 255, 0.8); border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 50px; padding: 8px 30px; font-size: 1.5rem; cursor: pointer; z-index: 20; display: none; transition: all 0.3s ease; backdrop-filter: blur(4px); outline: none; }
+        #topPlayBtn:hover { background: rgba(37, 99, 235, 0.9); color: white; border-color: var(--primary); box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+
+        /* Controls */
+        .display-controls { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px; background: rgba(0,0,0,0.6); padding: 8px 20px; border-radius: 30px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 20; }
+        .display-wrapper:hover .display-controls { opacity: 1; pointer-events: auto; }
+        .ctrl-btn { color: white; background: none; border: none; font-size: 1.2rem; cursor: pointer; position: relative; }
+        .ctrl-btn:hover { color: var(--primary); }
+        .ctrl-btn.active { color: var(--warning); text-shadow: 0 0 5px var(--warning); }
+
+        /* Notes */
+        .notes-wrapper { flex: 1; background: white; border-radius: 10px; display: flex; flex-direction: column; border: 1px solid #e2e8f0; }
+        .notes-search-box { padding: 10px; border-bottom: 1px solid #eee; }
+        .notes-search-box input { width: 100%; margin: 0; padding: 8px; font-size: 0.9rem; border: 1px solid #ddd; }
+        .notes-list { flex: 1; overflow-y: auto; padding: 0; }
+        .note-item { padding: 12px; border-bottom: 1px solid #f1f5f9; cursor: pointer; display: flex; flex-direction: column; gap: 6px; transition: 0.2s; }
+        .note-item:hover { background: #f8fafc; }
+        .note-item.active { background: #eff6ff; border-right: 4px solid var(--primary); }
+        .note-header { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: #64748b; font-weight: bold; }
+        .note-content { display: flex; gap: 10px; align-items: flex-start; }
+        .note-text { flex: 1; line-height: 1.4; font-size: 0.9rem; }
+        .note-image-large { width: 100%; max-height: 250px; object-fit: contain; border-radius: 6px; border: 1px solid #ddd; margin-bottom: 5px; background: #eee; }
+        .note-actions { display: flex; gap: 5px; }
+        .note-action-btn { border: none; background: none; cursor: pointer; font-size: 1rem; padding: 2px 5px; border-radius: 3px; }
+        .btn-edit-note:hover { background: #dbeafe; color: var(--primary); }
+        .btn-del-note:hover { background: #fee2e2; color: var(--danger); }
+
+        /* Loading */
+        #loadingOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.95); z-index: 2000; display: none; justify-content: center; align-items: center; flex-direction: column; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Modals */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal-overlay.active { display: flex; }
+        .modal-content { background: white; padding: 25px; border-radius: 12px; width: 450px; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+
+        .input-area { padding: 10px; border-top: 1px solid #ddd; background: #f9f9f9; display: flex; gap: 8px; align-items: center; }
+        #noteImagePreviewMini { width: 35px; height: 35px; object-fit: cover; border-radius: 4px; display: none; border: 1px solid #ccc; }
+        
+        .type-selector { display: flex; gap: 10px; margin-bottom: 15px; }
+        .type-option { flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; cursor: pointer; text-align: center; font-weight: bold; font-size: 0.9rem; }
+        .type-option.selected { border-color: var(--primary); background: #eff6ff; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+    <div id="loadingOverlay"><div class="spinner"></div><h3 id="loadingText" style="margin-top: 20px; color: var(--primary);">جاري المعالجة...</h3></div>
+
+    <!-- 1. الرئيسية -->
+    <div id="galleryView">
+        <header class="header">
+            <div><h2 style="margin:0; font-size:1.2rem; color: var(--primary);">📚 منصة الشروحات</h2></div>
+            <div style="display:flex; gap:10px;">
+                <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+                <button class="btn btn-warning" onclick="document.getElementById('importFile').click()">📂 استيراد</button>
+                <button class="btn btn-success" onclick="exportData()">📥 تصدير</button>
+                <button class="btn btn-primary" onclick="openAddModal()">+ شرح جديد</button>
+            </div>
+        </header>
+        <div class="gallery-container" id="galleryGrid"></div>
+    </div>
+
+    <!-- 2. المشغل -->
+    <div id="playerView">
+        <header class="header" style="padding: 10px 20px;">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <button class="btn btn-outline" onclick="showGallery()">➜ العودة</button>
+                <h3 id="playerTitle" style="margin:0; font-size:1.1rem;">عنوان الشرح</h3>
+                <button class="btn btn-outline" onclick="openEditContentModal()" title="تعديل">✏️</button>
+            </div>
+        </header>
+        <div class="main-player-layout">
+            <div class="display-wrapper" id="displayContainer">
+                
+                <!-- الفيديو -->
+                <video id="mainVideo" controls></video>
+                
+                <!-- صورة العرض (للسلايدشو أو لمعاينة صور الملاحظات) -->
+                <img id="mainDisplayImage" src="" alt="Slide">
+                
+                <!-- زر إغلاق معاينة الصورة (يظهر فقط عند معاينة صورة فوق الفيديو) -->
+                <button id="closePreviewBtn" onclick="closeImagePreview()" title="إغلاق الصورة والعودة للفيديو">✖</button>
+
+                <!-- عدسة الزووم -->
+                <div id="zoomLens"></div>
+
+                <!-- الزر العلوي الشفاف للتشغيل -->
+                <button id="topPlayBtn" onclick="toggleSlideshow()">▶</button>
+
+                <!-- أزرار التحكم السفلية -->
+                <div class="display-controls" id="slideshowControls">
+                    <button class="ctrl-btn" onclick="prevSlide()" title="السابق">❮</button>
+                    <button class="ctrl-btn" onclick="toggleSlideshow()" id="miniPlayBtn" title="تشغيل/إيقاف">⏯</button>
+                    <button class="ctrl-btn" onclick="nextSlide()" title="التالي">❯</button>
+                    <button class="ctrl-btn" id="zoomToggleBtn" onclick="toggleZoom()" title="زووم">🔍</button>
+                    <button class="ctrl-btn" onclick="toggleFullscreen()" title="ملء الشاشة">⛶</button>
+                </div>
+
+                <div id="missingContentMsg" style="display:none; position:absolute; text-align:center; color:white; background:rgba(0,0,0,0.8); padding:20px; border-radius:10px;">
+                    <h3>⚠️ الملف غير موجود</h3>
+                    <button class="btn btn-primary" onclick="openEditContentModal()">إعادة ربط الملف</button>
+                </div>
+            </div>
+            
+            <div class="notes-wrapper">
+                <div class="notes-search-box">
+                    <input type="text" id="notesSearchInput" placeholder="🔍 بحث في الملاحظات..." onkeyup="filterNotes()">
+                </div>
+
+                <div class="notes-list" id="notesList"></div>
+                <div class="input-area">
+                    <label for="noteImageInput" class="btn-icon" style="background:#e2e8f0;" title="إرفاق صورة">📷</label>
+                    <input type="file" id="noteImageInput" accept="image/*" style="display:none" onchange="previewNoteImage(this)">
+                    <img id="noteImagePreviewMini">
+                    <input type="text" id="noteInput" placeholder="اكتب ملاحظة (1988)..." style="margin:0; flex:1" onkeypress="if(event.key==='Enter') requestPassword('add')">
+                    <button class="btn btn-primary" onclick="requestPassword('add')">إرسال</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal-content">
+            <h3>إضافة شرح جديد</h3>
+            <label>عنوان الشرح</label><input type="text" id="inputTitle">
+            <label>صورة الغلاف</label><input type="file" id="inputCover" accept="image/*" style="margin-bottom:20px;">
+            <label>نوع المحتوى</label>
+            <div class="type-selector">
+                <div class="type-option selected" id="optVideo" onclick="selectType('video')">📹 فيديو</div>
+                <div class="type-option" id="optImages" onclick="selectType('images')">🖼️ صور (ملاحظات)</div>
+            </div>
+            <div id="videoInputSection">
+                <label>ملف الفيديو</label><input type="file" id="inputVideoFile" accept="video/*">
+            </div>
+            <div id="imagesInputSection" style="display:none; color:#666; background:#f0f9ff; padding:10px; border-radius:6px; font-size:0.85rem;">
+                ℹ️ ستظهر زر Play في الشاشة. عند النقر عليه، سيتم عرض الصور الموجودة في الملاحظات بشكل متتابع.
+            </div>
+            <button class="btn btn-primary" style="width:100%; margin-top:15px;" onclick="saveContentLocally()">حفظ</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:5px" onclick="document.getElementById('addModal').classList.remove('active')">إلغاء</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="editContentModal">
+        <div class="modal-content">
+            <h3>✏️ تعديل بيانات الشرح</h3>
+            <label>تعديل العنوان</label><input type="text" id="editTitleInput">
+            <label>تغيير صورة الغلاف</label><input type="file" id="editCoverInput" accept="image/*" style="margin-bottom:15px;">
+            <div id="editVideoSection">
+                <label>تغيير ملف الفيديو</label><input type="file" id="editVideoInput" accept="video/*">
+            </div>
+            <button class="btn btn-primary" style="width:100%; margin-top:15px;" onclick="saveEditedContent()">حفظ التعديلات</button>
+            <button class="btn btn-outline" style="width:100%; margin-top:5px" onclick="document.getElementById('editContentModal').classList.remove('active')">إلغاء</button>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="passwordModal">
+        <div class="modal-content" style="text-align: center;">
+            <h3 id="passModalTitle">🔒 مطلوب إذن المسؤول</h3>
+            <input type="password" id="passwordInput" placeholder="****" style="text-align:center; font-size:1.2rem; letter-spacing: 5px;">
+            <button class="btn btn-primary" onclick="verifyPassword()" style="width:100%">تأكيد</button>
+            <button class="btn btn-outline" onclick="closePasswordModal()" style="width:100%; margin-top:5px">إلغاء</button>
+        </div>
+    </div>
+
+    <script>
+        let db;
+        const request = indexedDB.open("EduPlatformDB_V3", 3);
+        
+        request.onupgradeneeded = e => {
+            db = e.target.result;
+            if(!db.objectStoreNames.contains("content")) db.createObjectStore("content", { keyPath: "id" });
+        };
+        request.onsuccess = e => { db = e.target.result; loadGallery(); };
+
+        let currentData = null;
+        let pendingNoteText = "";
+        let pendingNoteImage = null;
+        let selectedContentType = "video";
+        let pendingAction = null; 
+        let actionTargetId = null;
+
+        // Slideshow Variables
+        let slideshowInterval = null;
+        let isSlideshowPlaying = false;
+        let slideNotesIndices = [];
+        let currentSlideIndex = -1;
+        let isZoomActive = false;
+
+        // Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('playerView').style.display === 'none') return;
+            if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+            if (currentData && currentData.type !== 'video') {
+                if (e.key === 'ArrowRight') nextSlide();
+                else if (e.key === 'ArrowLeft') prevSlide();
+                else if (e.key === ' ') { e.preventDefault(); toggleSlideshow(); }
+            } else if (currentData && currentData.type === 'video') {
+                 const vid = document.getElementById('mainVideo');
+                 if(e.key === ' ') { e.preventDefault(); vid.paused ? vid.play() : vid.pause(); }
+                 if(e.key === 'ArrowRight') vid.currentTime += 5;
+                 if(e.key === 'ArrowLeft') vid.currentTime -= 5;
+            }
+        });
+
+        // UI Logic
+        function openAddModal() {
+            document.getElementById('addModal').classList.add('active');
+            selectType('video'); 
+        }
+        function selectType(type) {
+            selectedContentType = type;
+            document.getElementById('optVideo').className = type === 'video' ? 'type-option selected' : 'type-option';
+            document.getElementById('optImages').className = type === 'images' ? 'type-option selected' : 'type-option';
+            document.getElementById('videoInputSection').style.display = type === 'video' ? 'block' : 'none';
+            document.getElementById('imagesInputSection').style.display = type === 'images' ? 'block' : 'none';
+        }
+        function saveContentLocally() {
+            const title = document.getElementById('inputTitle').value;
+            const coverFile = document.getElementById('inputCover').files[0];
+            if(!title || !coverFile) return alert("المرجو إدخال العنوان وصورة الغلاف");
+
+            // استخدام تنسيق تاريخ قياسي (ISO) لضمان التوافق بين المتصفحات
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0'); // الأشهر من 0-11
+            const day = String(today.getDate()).padStart(2, '0');
+            const isoDate = `${year}-${month}-${day}`;
+
+            let newItem = { id: Date.now(), title: title, coverBlob: coverFile, type: selectedContentType, notes: [], date: isoDate };
+            if (selectedContentType === 'video') {
+                const vidFile = document.getElementById('inputVideoFile').files[0];
+                if (!vidFile) return alert("المرجو اختيار ملف الفيديو");
+                newItem.videoBlob = vidFile;
+            } else { newItem.videoBlob = null; }
+
+            const tx = db.transaction(["content"], "readwrite");
+            tx.objectStore("content").add(newItem);
+            tx.oncomplete = () => { document.getElementById('addModal').classList.remove('active'); loadGallery(); };
+        }
+
+        function loadGallery() {
+            const tx = db.transaction(["content"], "readonly");
+            tx.objectStore("content").getAll().onsuccess = (e) => {
+                const grid = document.getElementById('galleryGrid');
+                grid.innerHTML = "";
+                e.target.result.forEach(item => {
+                    const imgSrc = item.coverBlob ? URL.createObjectURL(item.coverBlob) : '';
+                    const typeLabel = item.type === 'video' ? '📹 فيديو' : '🖼️ صور';
+                    const div = document.createElement('div');
+                    div.className = 'video-card';
+                    const deleteBtn = `<button class="delete-card-btn" onclick="requestPassword('delete_card', ${item.id}, event)" title="حذف">✖</button>`;
+                    div.innerHTML = `${deleteBtn}<div class="card-img" onclick="openPlayer(${item.id})"><span class="type-badge">${typeLabel}</span>${imgSrc ? `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover">` : '📂'}</div><div class="card-body" onclick="openPlayer(${item.id})"><h3>${item.title}</h3><small>📅 ${item.date}</small></div>`;
+                    grid.appendChild(div);
+                });
+            };
+        }
+        function performDeleteCard(id) {
+            const tx = db.transaction(["content"], "readwrite");
+            tx.objectStore("content").delete(id);
+            tx.oncomplete = () => { loadGallery(); alert("✅ تم الحذف"); };
+        }
+
+        // Player & Display
+        function openPlayer(id) {
+            stopSlideshow();
+            if(isZoomActive) toggleZoom();
+
+            const tx = db.transaction(["content"], "readonly");
+            tx.objectStore("content").get(id).onsuccess = (e) => {
+                currentData = e.target.result;
+                document.getElementById('galleryView').style.display = 'none';
+                document.getElementById('playerView').style.display = 'flex';
+                document.getElementById('playerTitle').innerText = currentData.title;
+                
+                const vidEl = document.getElementById('mainVideo');
+                const imgEl = document.getElementById('mainDisplayImage');
+                const controls = document.getElementById('slideshowControls');
+                const missingMsg = document.getElementById('missingContentMsg');
+                const topBtn = document.getElementById('topPlayBtn');
+                const closeBtn = document.getElementById('closePreviewBtn');
+                
+                vidEl.style.display = 'none'; imgEl.style.display = 'none';
+                controls.style.display = 'none'; missingMsg.style.display = 'none'; 
+                topBtn.style.display = 'none'; closeBtn.style.display = 'none';
+
+                if (currentData.type === 'video') {
+                    if (currentData.videoBlob) {
+                        vidEl.src = URL.createObjectURL(currentData.videoBlob);
+                        vidEl.style.display = 'block';
+                    } else { missingMsg.style.display = 'block'; }
+                    // في الفيديو، نظهر زر الزووم والتحكم السفلي أيضاً (لعرض الصور)
+                    controls.style.display = 'flex'; 
+                    // نخفي أزرار السلايدشو من الشريط السفلي لأننا في فيديو
+                    document.getElementById('miniPlayBtn').style.display = 'none';
+                } else {
+                    controls.style.display = 'flex';
+                    topBtn.style.display = 'block';
+                    document.getElementById('miniPlayBtn').style.display = 'block';
+                    if (currentData.coverBlob) {
+                        imgEl.src = URL.createObjectURL(currentData.coverBlob);
+                        imgEl.style.display = 'block';
+                    }
+                    prepareSlideshowIndices();
+                }
+                renderNotes();
+            };
+        }
+
+        // --- عرض صورة الملاحظة فوق الفيديو ---
+        function showImageOverlay(url) {
+            if(currentData.type === 'video') {
+                const vid = document.getElementById('mainVideo');
+                const img = document.getElementById('mainDisplayImage');
+                const btn = document.getElementById('closePreviewBtn');
+
+                vid.pause();
+                vid.style.display = 'none';
+                
+                img.src = url;
+                img.style.display = 'block';
+                btn.style.display = 'block'; // إظهار زر الإغلاق
+            }
+        }
+
+        function closeImagePreview() {
+            const vid = document.getElementById('mainVideo');
+            const img = document.getElementById('mainDisplayImage');
+            const btn = document.getElementById('closePreviewBtn');
+
+            img.style.display = 'none';
+            btn.style.display = 'none';
+            vid.style.display = 'block'; // إعادة الفيديو
+            // لا نشغل الفيديو تلقائياً لترك الخيار للمستخدم
+        }
+
+        function toggleFullscreen() {
+            const elem = document.querySelector('.display-wrapper');
+            if (!document.fullscreenElement) elem.requestFullscreen().catch(err => alert(`Error: ${err.message}`));
+            else document.exitFullscreen();
+        }
+
+        // Zoom
+        function toggleZoom() {
+            const img = document.getElementById('mainDisplayImage');
+            const lens = document.getElementById('zoomLens');
+            const btn = document.getElementById('zoomToggleBtn');
+
+            if (img.style.display === 'none') return; // لا زووم إذا لم تكن هناك صورة
+
+            if (!isZoomActive) {
+                isZoomActive = true;
+                lens.style.display = "block";
+                lens.style.backgroundImage = `url('${img.src}')`;
+                btn.classList.add('active');
+                img.classList.add('zoom-active-cursor');
+                img.addEventListener("mousemove", moveLens);
+                lens.addEventListener("mousemove", moveLens);
+            } else {
+                isZoomActive = false;
+                lens.style.display = "none";
+                btn.classList.remove('active');
+                img.classList.remove('zoom-active-cursor');
+                img.removeEventListener("mousemove", moveLens);
+                lens.removeEventListener("mousemove", moveLens);
+            }
+        }
+        function moveLens(e) {
+            e.preventDefault();
+            const img = document.getElementById('mainDisplayImage');
+            const lens = document.getElementById('zoomLens');
+            const pos = getCursorPos(e, img);
+            let x = pos.x; let y = pos.y;
+            const cx = 2.5; const cy = 2.5;
+            const imgWidth = img.width; const imgHeight = img.height;
+            lens.style.backgroundSize = (imgWidth * cx) + "px " + (imgHeight * cy) + "px";
+            if (x > imgWidth - (lens.offsetWidth / 2)) { x = imgWidth - (lens.offsetWidth / 2); }
+            if (x < lens.offsetWidth / 2) { x = lens.offsetWidth / 2; }
+            if (y > imgHeight - (lens.offsetHeight / 2)) { y = imgHeight - (lens.offsetHeight / 2); }
+            if (y < lens.offsetHeight / 2) { y = lens.offsetHeight / 2; }
+            lens.style.left = (x - (lens.offsetWidth / 2)) + "px";
+            lens.style.top = (y - (lens.offsetHeight / 2)) + "px";
+            lens.style.backgroundPosition = "-" + ((x * cx) - (lens.offsetWidth / 2)) + "px -" + ((y * cy) - (lens.offsetHeight / 2)) + "px";
+        }
+        function getCursorPos(e, img) {
+            let a, x = 0, y = 0; e = e || window.event;
+            a = img.getBoundingClientRect();
+            x = e.pageX - a.left; y = e.pageY - a.top;
+            x = x - window.pageXOffset; y = y - window.pageYOffset;
+            return {x : x, y : y};
+        }
+
+        // Other Logic
+        function filterNotes() {
+            const term = document.getElementById('notesSearchInput').value.toLowerCase();
+            document.querySelectorAll('.note-item').forEach(item => { item.style.display = item.innerText.toLowerCase().includes(term) ? 'flex' : 'none'; });
+        }
+
+        // Slideshow
+        function prepareSlideshowIndices() {
+            slideNotesIndices = [];
+            if(currentData.notes) { currentData.notes.forEach((note, index) => { if(note.imageBlob) slideNotesIndices.push(index); }); }
+            currentSlideIndex = -1;
+        }
+        function toggleSlideshow() { if (isSlideshowPlaying) stopSlideshow(); else startSlideshow(); }
+        function startSlideshow() {
+            if (slideNotesIndices.length === 0) return alert("لا توجد صور في الملاحظات للعرض!");
+            if(isZoomActive) toggleZoom();
+            isSlideshowPlaying = true;
+            document.getElementById('miniPlayBtn').innerText = "⏸";
+            document.getElementById('topPlayBtn').innerText = "⏸";
+            if(currentSlideIndex === -1) nextSlide(); else showCurrentSlide();
+            slideshowInterval = setInterval(nextSlide, 3000);
+        }
+        function stopSlideshow() {
+            isSlideshowPlaying = false; clearInterval(slideshowInterval); slideshowInterval = null;
+            if (currentData && currentData.type !== 'video') {
+                document.getElementById('miniPlayBtn').innerText = "⏯";
+                document.getElementById('topPlayBtn').innerText = "▶";
+            }
+        }
+        function nextSlide() {
+            if (slideNotesIndices.length === 0) return;
+            currentSlideIndex++; if (currentSlideIndex >= slideNotesIndices.length) currentSlideIndex = 0;
+            showCurrentSlide();
+        }
+        function prevSlide() {
+            if (slideNotesIndices.length === 0) return;
+            currentSlideIndex--; if (currentSlideIndex < 0) currentSlideIndex = slideNotesIndices.length - 1;
+            showCurrentSlide();
+        }
+        function showCurrentSlide() {
+            const noteIndex = slideNotesIndices[currentSlideIndex];
+            const note = currentData.notes[noteIndex];
+            const imgEl = document.getElementById('mainDisplayImage');
+            imgEl.src = URL.createObjectURL(note.imageBlob);
+            imgEl.style.display = 'block';
+            if(isZoomActive) document.getElementById('zoomLens').style.backgroundImage = `url('${imgEl.src}')`;
+            highlightNote(noteIndex);
+        }
+        function highlightNote(index) {
+            document.querySelectorAll('.note-item').forEach(el => el.classList.remove('active'));
+            const activeEl = document.querySelectorAll('.note-item')[index];
+            if(activeEl) { activeEl.classList.add('active'); activeEl.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+        }
+        
+        function manualShowImage(noteIndex) {
+            const note = currentData.notes[noteIndex];
+            if (note.imageBlob) {
+                const url = URL.createObjectURL(note.imageBlob);
+                if (currentData.type === 'video') {
+                    showImageOverlay(url); // دالة خاصة للفيديو
+                } else {
+                    stopSlideshow();
+                    const imgEl = document.getElementById('mainDisplayImage');
+                    imgEl.src = url;
+                    imgEl.style.display = 'block';
+                    if(isZoomActive) document.getElementById('zoomLens').style.backgroundImage = `url('${imgEl.src}')`;
+                    const internalIndex = slideNotesIndices.indexOf(noteIndex);
+                    if(internalIndex !== -1) currentSlideIndex = internalIndex;
+                    highlightNote(noteIndex);
+                }
+            }
+        }
+
+        // Notes Render
+        function renderNotes() {
+            const list = document.getElementById('notesList');
+            list.innerHTML = "";
+            const isVideo = currentData.type === 'video';
+            currentData.notes.forEach((n, index) => {
+                const div = document.createElement('div');
+                div.className = 'note-item';
+                div.onclick = (e) => {
+                    if(e.target.closest('.note-actions')) return;
+                    if (isVideo) { 
+                        // إذا كان هناك صورة، نعرضها أولاً
+                        if(n.imageBlob) {
+                            manualShowImage(index);
+                        } else {
+                            // إذا نص فقط، نقفز للتوقيت
+                            const v = document.getElementById('mainVideo'); 
+                            if (n.time !== null) { v.currentTime = n.time; v.play(); } 
+                        }
+                    } else { 
+                        manualShowImage(index); 
+                    }
+                };
+                
+                let contentHTML = "";
+                if (n.imageBlob) { 
+                    const url = URL.createObjectURL(n.imageBlob); 
+                    contentHTML += `<img src="${url}" class="note-image-large" onclick="event.stopPropagation(); manualShowImage(${index})">`; 
+                }
+                if (n.text) contentHTML += `<div class="note-text">${n.text}</div>`;
+                
+                let headerInfo = isVideo && n.time !== null ? `<span>⏰ ${formatTime(n.time)}</span>` : `<span>#${index+1}</span>`;
+                let actionsHTML = `<div class="note-actions"><button class="note-action-btn btn-edit-note" onclick="requestPassword('edit_note', ${index}, event)">✎</button><button class="note-action-btn btn-del-note" onclick="requestPassword('delete_note', ${index}, event)">✖</button></div>`;
+                div.innerHTML = `<div class="note-header">${headerInfo} ${actionsHTML}</div><div class="note-content" style="flex-direction:column; gap:5px;">${contentHTML}</div>`;
+                list.appendChild(div);
+            });
+        }
+
+        function openEditContentModal() { requestPassword('edit_content'); }
+        function showEditContentModal() { document.getElementById('editContentModal').classList.add('active'); document.getElementById('editTitleInput').value = currentData.title; document.getElementById('editVideoSection').style.display = currentData.type === 'video' ? 'block' : 'none'; }
+        function saveEditedContent() {
+            const newTitle = document.getElementById('editTitleInput').value;
+            const newCover = document.getElementById('editCoverInput').files[0];
+            const newVideo = document.getElementById('editVideoInput').files[0];
+            if(newTitle) currentData.title = newTitle;
+            if(newCover) currentData.coverBlob = newCover;
+            if(currentData.type === 'video' && newVideo) currentData.videoBlob = newVideo;
+            const tx = db.transaction(["content"], "readwrite");
+            tx.objectStore("content").put(currentData);
+            tx.oncomplete = () => { document.getElementById('editContentModal').classList.remove('active'); openPlayer(currentData.id); alert("✅ تم"); };
+        }
+
+        function previewNoteImage(input) { const file = input.files[0]; if (file) { pendingNoteImage = file; document.getElementById('noteImagePreviewMini').src = URL.createObjectURL(file); document.getElementById('noteImagePreviewMini').style.display = 'block'; } }
+        function requestPassword(action, id = null, event = null) { if (event) event.stopPropagation(); if (action === 'add') { const text = document.getElementById('noteInput').value.trim(); if (!text && !pendingNoteImage) return; pendingNoteText = text; } pendingAction = action; actionTargetId = id; document.getElementById('passwordModal').classList.add('active'); document.getElementById('passwordInput').value = ''; document.getElementById('passwordInput').focus(); }
+        function verifyPassword() { if(document.getElementById('passwordInput').value === "1988") { document.getElementById('passwordModal').classList.remove('active'); if (pendingAction === 'add') performAddNote(); else if (pendingAction === 'delete_card') performDeleteCard(actionTargetId); else if (pendingAction === 'edit_content') showEditContentModal(); else if (pendingAction === 'delete_note') { currentData.notes.splice(actionTargetId, 1); saveAndRefreshNotes(); } else if (pendingAction === 'edit_note') { const newText = prompt("تعديل النص:", currentData.notes[actionTargetId].text); if(newText !== null) { currentData.notes[actionTargetId].text = newText; saveAndRefreshNotes(); } } } else { alert("كلمة المرور خاطئة"); } }
+        function performAddNote() { let t = null; if (currentData.type === 'video') { const v = document.getElementById('mainVideo'); t = (v && v.duration) ? v.currentTime : 0; } currentData.notes.push({ time: t, text: pendingNoteText, imageBlob: pendingNoteImage }); if (currentData.type === 'video') currentData.notes.sort((a,b) => (a.time||0)-(b.time||0)); saveAndRefreshNotes(); document.getElementById('noteInput').value = ""; document.getElementById('noteImageInput').value = ""; document.getElementById('noteImagePreviewMini').style.display = 'none'; pendingNoteImage = null; if(currentData.type !== 'video') prepareSlideshowIndices(); }
+        function saveAndRefreshNotes() { const tx = db.transaction(["content"], "readwrite"); tx.objectStore("content").put(currentData); tx.oncomplete = renderNotes; }
+        function closePasswordModal() { document.getElementById('passwordModal').classList.remove('active'); }
+        function showGallery() { stopSlideshow(); if(isZoomActive) toggleZoom(); const v = document.getElementById('mainVideo'); v.pause(); v.src = ""; document.getElementById('playerView').style.display = 'none'; document.getElementById('galleryView').style.display = 'block'; loadGallery(); }
+        function formatTime(s) { const m = Math.floor(s/60); const sec = Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+        document.getElementById('mainVideo').addEventListener('timeupdate', function(){ if(currentData.type !== 'video') return; const t = this.currentTime; document.querySelectorAll('.note-item').forEach((el,i) => { el.classList.remove('active'); if(currentData.notes[i] && currentData.notes[i].time !== null && t >= currentData.notes[i].time && (!currentData.notes[i+1] || t < currentData.notes[i+1].time)) { el.classList.add('active'); el.scrollIntoView({behavior:'smooth', block:'nearest'}); } }); });
+        function blobToBase64(blob) { return new Promise((r, j) => { const reader = new FileReader(); reader.onloadend = () => r(reader.result); reader.onerror = j; reader.readAsDataURL(blob); }); }
+        async function base64ToBlob(base64) { const res = await fetch(base64); return await res.blob(); }
+        async function exportData() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            try {
+                const tx = db.transaction(["content"], "readonly");
+                const store = tx.objectStore("content");
+                const allContent = await new Promise((resolve) => { store.getAll().onsuccess = e => resolve(e.target.result); });
+ 
+                const exportPromises = allContent.map(async (item) => {
+                    // --- بداية التعديل: توحيد صيغة التاريخ ---
+                    let standardizedDate = item.date;
+                    // التحقق إذا كان التاريخ بالتنسيق القديم (مثل 25/12/2024)
+                    if (String(standardizedDate).includes('/')) {
+                        const parts = standardizedDate.split('/');
+                        // إعادة ترتيبه إلى الصيغة القياسية YYYY-MM-DD
+                        if (parts.length === 3) {
+                            standardizedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+                        }
+                    }
+                    // --- نهاية التعديل ---
+
+                    const videoBase64 = (item.type === 'video' && item.videoBlob) ? await blobToBase64(item.videoBlob) : null;
+                    const coverBase64 = item.coverBlob ? await blobToBase64(item.coverBlob) : null;
+                    const notes = await Promise.all(item.notes.map(async (n) => ({
+                        time: n.time, text: n.text, imageBase64: n.imageBlob ? await blobToBase64(n.imageBlob) : null,
+                    })));
+                    return { id: item.id, title: item.title, type: item.type, date: standardizedDate, notes, coverBase64, videoBase64 };
+                });
+ 
+                const exportArr = await Promise.all(exportPromises);
+                const blob = new Blob([JSON.stringify(exportArr, null, 2)], { type: "application/json" });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `Edu_Backup_${Date.now()}.json`;
+                a.click(); // The download will start
+                URL.revokeObjectURL(a.href); // Clean up the object URL
+            } catch (e) {
+                alert(`حدث خطأ أثناء التصدير: ${e.message}`);
+            } finally {
+                document.getElementById('loadingOverlay').style.display = 'none';
+            }
+        }
+        async function importData(input) {
+            const file = input.files[0];
+            if (!file) return;
+            document.getElementById('loadingOverlay').style.display = 'flex';
+            try {
+                // الخطوة 1: قراءة الملف وتحويل كل البيانات (بما في ذلك الصور) خارج معاملة قاعدة البيانات
+                const fileContent = await file.text();
+                const parsedData = JSON.parse(fileContent);
+                
+                const processedData = await Promise.all(parsedData.map(async (item) => {
+                    const videoBlob = item.videoBase64 ? await base64ToBlob(item.videoBase64) : null;
+                    const coverBlob = item.coverBase64 ? await base64ToBlob(item.coverBase64) : null;
+                    const notes = await Promise.all((item.notes || []).map(async (n) => ({
+                        time: n.time, text: n.text, imageBlob: n.imageBase64 ? await base64ToBlob(n.imageBase64) : null,
+                    })));
+                    return { id: item.id || Date.now(), title: item.title, type: item.type || 'video', date: item.date, coverBlob, notes, videoBlob: videoBlob };
+                }));
+
+                // الخطوة 2: الآن بعد أن أصبحت جميع البيانات جاهزة، نبدأ المعاملة ونقوم بإضافتها
+                const tx = db.transaction(["content"], "readwrite");
+                const store = tx.objectStore("content");
+                processedData.forEach(item => store.put(item));
+
+                tx.oncomplete = () => { loadGallery(); alert("✅ تم الاستيراد بنجاح"); };
+                tx.onerror = (event) => { throw new Error('فشل في الكتابة إلى قاعدة البيانات: ' + event.target.error); };
+
+            } catch (err) {
+                console.error("Import Error:", err);
+                alert("❌ ملف تالف أو حدث خطأ أثناء الاستيراد.");
+            } finally {
+                document.getElementById('loadingOverlay').style.display = 'none';
+                input.value = ''; // Reset file input
+            }
+        }
+    </script>
+</body>
+</html>
